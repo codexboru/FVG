@@ -1,0 +1,61 @@
+//@version=6
+indicator("FVG Lines (3-candle, autodelete, style options)", overlay=true)
+
+// Optional: Timeframe
+tf = input.timeframe("", "Timeframe")
+
+// Einstellungen für Farben, Linienart und Breite
+bullColor  = input.color(color.green, "Bullish FVG Farbe")
+bearColor  = input.color(color.red,   "Bearish FVG Farbe")
+bullStyleS = input.string("solid", "Bullish Linienart", options=["solid","dashed","dotted"])
+bearStyleS = input.string("solid", "Bearish Linienart", options=["solid","dashed","dotted"])
+bullWidth  = input.int(1, "Bullish Linienstärke", minval=1, maxval=5)
+bearWidth  = input.int(1, "Bearish Linienstärke", minval=1, maxval=5)
+
+// Mapping: String → line.style (einzeilig)
+styleFrom(s) => s == "dashed" ? line.style_dashed : s == "dotted" ? line.style_dotted : line.style_solid
+bullStyle = styleFrom(bullStyleS)
+bearStyle = styleFrom(bearStyleS)
+
+// Speicher
+var activeLines = array.new_line()
+var levels      = array.new_float()
+var isBull      = array.new_bool()
+
+// FVG-Erkennung (klassisches 3-Kerzen-Muster)
+f_detect_bear_bull() =>
+    bullFvg = (low > high[2]) and (close[1] > high[2])
+    bearFvg = (high < low[2]) and (close[1] < low[2])
+    [bullFvg, bearFvg]
+
+// Auf gewünschtem TF auswerten
+[bullFvg, bearFvg] = request.security(syminfo.tickerid, tf, f_detect_bear_bull())
+
+// Startindex der ersten Kerze (Kerze2)
+startBarIndex = bar_index[2]
+
+// Linien erzeugen (einzeilig, benannte Parameter)
+if bullFvg and not na(high[2])
+    lvl = high[2]
+    ln = line.new(x1=startBarIndex, y1=lvl, x2=bar_index, y2=lvl, xloc=xloc.bar_index, extend=extend.right, color=bullColor, style=bullStyle, width=bullWidth)
+    array.push(activeLines, ln)
+    array.push(levels, lvl)
+    array.push(isBull, true)
+
+if bearFvg and not na(low[2])
+    lvl = low[2]
+    ln = line.new(x1=startBarIndex, y1=lvl, x2=bar_index, y2=lvl, xloc=xloc.bar_index, extend=extend.right, color=bearColor, style=bearStyle, width=bearWidth)
+    array.push(activeLines, ln)
+    array.push(levels, lvl)
+    array.push(isBull, false)
+
+// Auto-Löschen bei Berührung
+if array.size(activeLines) > 0
+    for i = array.size(activeLines) - 1 to 0
+        lvl = array.get(levels, i)
+        touched = (low <= lvl and high >= lvl)
+        if touched
+            ln = array.remove(activeLines, i)
+            line.delete(ln)
+            array.remove(levels, i)
+            array.remove(isBull, i)
