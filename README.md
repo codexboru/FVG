@@ -1,4 +1,4 @@
-![FVG](test.png)
+![FVG](test.PNG)
 
 
 # FVG
